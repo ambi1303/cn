@@ -1,0 +1,68 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/ether.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+void get_ip_mac_hostname() {
+    struct sockaddr_in sa;
+    struct ifreq ifr;
+    char ip[INET_ADDRSTRLEN];  // Buffer for IP address
+    char hostname[1024];        // Buffer for hostname
+    const char *interface = "eth0"; // Specify your interface here
+
+    // Get the hostname
+    if (gethostname(hostname, sizeof(hostname)) == -1) {
+        perror("gethostname");
+        exit(EXIT_FAILURE);
+    }
+    printf("Hostname: %s\n", hostname);
+
+    // Create a socket to get the IP address
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Get the IP address
+    strncpy(ifr.ifr_name, interface, IFNAMSIZ-1);
+    if (ioctl(sockfd, SIOCGIFADDR, &ifr) < 0) {
+        perror("ioctl failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+    close(sockfd);
+
+    // Convert the IP address to string format
+    sa = *(struct sockaddr_in *)&ifr.ifr_addr;
+    inet_ntop(AF_INET, &sa.sin_addr, ip, sizeof(ip));
+    printf("IP Address: %s\n", ip);
+
+    // Get the MAC address
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+    if (ioctl(sockfd, SIOCGIFHWADDR, &ifr) < 0) {
+        perror("ioctl failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+    close(sockfd);
+
+    // Print the MAC address
+    unsigned char *mac = (unsigned char *)ifr.ifr_hwaddr.sa_data;
+    printf("MAC Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
+           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
+int main() {
+    get_ip_mac_hostname();
+    return 0;
+}
